@@ -47,9 +47,7 @@ interface BuildSnapshot {
   message?: string;
 }
 
-const buildSnapshot: BuildSnapshot = {
-  state: 'idle',
-};
+const buildSnapshots = new Map<string, BuildSnapshot>();
 
 class AsymptoteSidebarItem extends vscode.TreeItem {
   constructor(
@@ -87,8 +85,31 @@ class AsymptoteSidebarProvider implements vscode.TreeDataProvider<AsymptoteSideb
   private readonly changeEmitter = new vscode.EventEmitter<AsymptoteSidebarItem | undefined | void>();
 
   readonly onDidChangeTreeData = this.changeEmitter.event;
+  private workspaceAsyFiles: vscode.Uri[] = [];
 
-  constructor(private readonly getActiveFilePath: () => string | undefined) {}
+  constructor(private readonly getActiveFilePath: () => string | undefined, context: vscode.ExtensionContext) {
+    this.initFileWatcher(context);
+  }
+
+  private initFileWatcher(context: vscode.ExtensionContext) {
+    vscode.workspace.findFiles('**/*.asy', '**/{node_modules,.git,out}/**', 50).then((files) => {
+      this.workspaceAsyFiles = files;
+      this.refresh();
+    });
+
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*.asy');
+    context.subscriptions.push(watcher);
+    watcher.onDidCreate(uri => {
+      if (!this.workspaceAsyFiles.some(f => f.fsPath === uri.fsPath)) {
+        this.workspaceAsyFiles.push(uri);
+        this.refresh();
+      }
+    });
+    watcher.onDidDelete(uri => {
+      this.workspaceAsyFiles = this.workspaceAsyFiles.filter(f => f.fsPath !== uri.fsPath);
+      this.refresh();
+    });
+  }
 
   refresh(): void {
     this.changeEmitter.fire();
@@ -194,7 +215,7 @@ class AsymptoteSidebarProvider implements vscode.TreeDataProvider<AsymptoteSideb
 
   private createBuildStatusSection(activeFilePath: string): AsymptoteSidebarItem {
     const lines: AsymptoteSidebarItem[] = [];
-    const snapshot = buildSnapshot;
+    const snapshot = buildSnapshots.get(activeFilePath) || { state: 'idle' };
 
     if (snapshot.state === 'idle') {
       lines.push(
@@ -250,33 +271,31 @@ class AsymptoteSidebarProvider implements vscode.TreeDataProvider<AsymptoteSideb
   }
 
   private createWorkspaceFilesSection(activeFilePath: string): Thenable<AsymptoteSidebarItem> {
-    return vscode.workspace.findFiles('**/*.asy', '**/{node_modules,.git,out}/**', 50).then((files) => {
-      const children = files
-        .map((file) => this.createWorkspaceFileItem(file, activeFilePath))
-        .sort((left, right) => left.labelText.localeCompare(right.labelText));
+    const children = this.workspaceAsyFiles
+      .map((file) => this.createWorkspaceFileItem(file, activeFilePath))
+      .sort((left, right) => left.labelText.localeCompare(right.labelText));
 
-      if (children.length === 0) {
-        children.push(
-          new AsymptoteSidebarItem(
-            'No .asy files found in workspace',
-            'info',
-            vscode.TreeItemCollapsibleState.None,
-            undefined,
-            undefined,
-            'Add Asymptote files to the workspace to populate this list.',
-          ),
-        );
-      }
-
-      return new AsymptoteSidebarItem(
-        'Workspace Files',
-        'section',
-        vscode.TreeItemCollapsibleState.Expanded,
-        undefined,
-        children,
-        'All Asymptote files discovered in the current workspace',
+    if (children.length === 0) {
+      children.push(
+        new AsymptoteSidebarItem(
+          'No .asy files found in workspace',
+          'info',
+          vscode.TreeItemCollapsibleState.None,
+          undefined,
+          undefined,
+          'Add Asymptote files to the workspace to populate this list.',
+        ),
       );
-    });
+    }
+
+    return Promise.resolve(new AsymptoteSidebarItem(
+      'Workspace Files',
+      'section',
+      vscode.TreeItemCollapsibleState.Expanded,
+      undefined,
+      children,
+      'All Asymptote files discovered in the current workspace',
+    ));
   }
 
   private createWorkspaceFileItem(file: vscode.Uri, activeFilePath: string): AsymptoteSidebarItem {
@@ -340,7 +359,7 @@ export function activate(context: vscode.ExtensionContext) {
   statusBarItem.text = '$(play) Asymptote Render';
   statusBarItem.tooltip = 'Render the active Asymptote file as PDF';
 
-  const sidebarProvider = new AsymptoteSidebarProvider(() => resolveBuildTarget());
+  const sidebarProvider = new AsymptoteSidebarProvider(() => resolveBuildTarget(), context);
   refreshSidebarView = () => sidebarProvider.refresh();
 
   const exportPdfCommand = vscode.commands.registerCommand('asymptoteBuild.exportPdfAndOpen', async (resource?: vscode.Uri) => {
@@ -412,7 +431,9 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    const outputFilePath = resolveOutputFilePath(targetFilePath, 'pdf');
+    const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+    const extraArgs = configuration.get<string[]>('extraArgs', []);
+    const outputFilePath = resolveOutputFilePath(targetFilePath, 'pdf', extraArgs);
     await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(outputFilePath));
   });
 
@@ -435,7 +456,9 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    const outputFilePath = resolveOutputFilePath(targetFilePath, 'pdf');
+    const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+    const extraArgs = configuration.get<string[]>('extraArgs', []);
+    const outputFilePath = resolveOutputFilePath(targetFilePath, 'pdf', extraArgs);
     await vscode.env.clipboard.writeText(outputFilePath);
     vscode.window.showInformationMessage(`Copied ${path.basename(outputFilePath)} to the clipboard.`);
   });
@@ -507,12 +530,18 @@ async function exportAsymptoteFile(
   targetFilePath: string,
   openOutput: boolean,
 ): Promise<void> {
+  const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+  const showOutputOnBuild = configuration.get<boolean>('showOutputOnBuild', true);
+  
   outputChannel.clear();
-  outputChannel.show(true);
+  if (showOutputOnBuild) {
+    outputChannel.show(true);
+  }
   outputChannel.appendLine(`Exporting ${targetFilePath} as ${outputFormat.toUpperCase()}`);
 
   try {
-    const result = await runAsymptoteBuild(executablePath, outputFormat, extraArgs, targetFilePath);
+    const timeoutMs = configuration.get<number>('timeout', 30000);
+    const result = await runAsymptoteBuild(executablePath, outputFormat, extraArgs, targetFilePath, timeoutMs);
     if (result.stdout) {
       outputChannel.append(result.stdout);
     }
@@ -521,25 +550,29 @@ async function exportAsymptoteFile(
     }
 
     vscode.window.showInformationMessage(`Asymptote export completed: ${path.basename(targetFilePath)} (${outputFormat})`);
-    buildSnapshot.state = 'success';
-    buildSnapshot.filePath = targetFilePath;
-    buildSnapshot.outputFormat = outputFormat;
-    buildSnapshot.timestamp = new Date();
-    buildSnapshot.message = `Rendered ${path.basename(targetFilePath)} successfully.`;
+    buildSnapshots.set(targetFilePath, {
+      state: 'success',
+      filePath: targetFilePath,
+      outputFormat: outputFormat,
+      timestamp: new Date(),
+      message: `Rendered ${path.basename(targetFilePath)} successfully.`,
+    });
 
     if (openOutput) {
-      const outputFilePath = resolveOutputFilePath(targetFilePath, outputFormat);
+      const outputFilePath = resolveOutputFilePath(targetFilePath, outputFormat, extraArgs);
       await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(outputFilePath));
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     outputChannel.appendLine(message);
     vscode.window.showErrorMessage(`Asymptote export failed: ${message}`);
-    buildSnapshot.state = 'failure';
-    buildSnapshot.filePath = targetFilePath;
-    buildSnapshot.outputFormat = outputFormat;
-    buildSnapshot.timestamp = new Date();
-    buildSnapshot.message = message;
+    buildSnapshots.set(targetFilePath, {
+      state: 'failure',
+      filePath: targetFilePath,
+      outputFormat: outputFormat,
+      timestamp: new Date(),
+      message: message,
+    });
   }
 
   refreshSidebarView();
@@ -550,13 +583,19 @@ function runAsymptoteBuild(
   outputFormat: string,
   extraArgs: string[],
   filePath: string,
+  timeoutMs: number,
 ): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const args = ['-f', outputFormat, ...extraArgs, filePath];
     const workingDirectory = path.dirname(filePath);
 
-    execFile(executablePath, args, { cwd: workingDirectory }, (error: Error | null, stdout: string, stderr: string) => {
+    const execOptions = { cwd: workingDirectory, timeout: timeoutMs > 0 ? timeoutMs : undefined };
+    execFile(executablePath, args, execOptions, (error: Error | null, stdout: string, stderr: string) => {
       if (error) {
+        if ((error as any).code === 'ENOENT') {
+          reject(new Error(`Asymptote executable not found: '${executablePath}'. Please install Asymptote and ensure it is in your PATH, or configure 'asymptoteBuild.executablePath' in settings.`));
+          return;
+        }
         const detail = stderr || stdout || error.message;
         reject(new Error(detail.trim()));
         return;
@@ -570,7 +609,22 @@ function runAsymptoteBuild(
   });
 }
 
-function resolveOutputFilePath(filePath: string, outputFormat: string): string {
+function resolveOutputFilePath(filePath: string, outputFormat: string, extraArgs?: string[]): string {
+  if (extraArgs) {
+    for (let i = 0; i < extraArgs.length; i++) {
+      if ((extraArgs[i] === '-o' || extraArgs[i] === '-outname' || extraArgs[i] === '--outname') && i + 1 < extraArgs.length) {
+        let outPath = extraArgs[i + 1];
+        if (!path.isAbsolute(outPath)) {
+          outPath = path.join(path.dirname(filePath), outPath);
+        }
+        if (!path.extname(outPath)) {
+          outPath += `.${outputFormat}`;
+        }
+        return outPath;
+      }
+    }
+  }
+
   const directory = path.dirname(filePath);
   const baseName = path.basename(filePath, path.extname(filePath));
 
