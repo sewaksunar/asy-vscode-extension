@@ -5,6 +5,10 @@
   "version": "0.0.1",
   "publisher": "vscode-asymptote",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sewaksunar/asy-vscode-extension"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -13,7 +17,8 @@
   ],
   "main": "./out/extension.js",
   "activationEvents": [
-    "onView:asymptoteBuildSidebar"
+    "onView:asymptoteBuildSidebar",
+    "onLanguage:asy"
   ],
   "files": [
     "out/**",
@@ -43,6 +48,16 @@
             "type": "string"
           },
           "description": "Additional arguments passed to the Asymptote command."
+        },
+        "asymptoteBuild.showOutputOnBuild": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically show the output channel when a build is triggered."
+        },
+        "asymptoteBuild.timeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "Timeout in milliseconds for the Asymptote build process. Set to 0 to disable."
         }
       }
     },
