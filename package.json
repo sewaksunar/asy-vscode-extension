@@ -1,0 +1,130 @@
+{
+  "name": "asy-vscode-extension",
+  "displayName": "Asy VSCode Extension",
+  "description": "Build and preview Asymptote (.asy) files from within Visual Studio Code.",
+  "version": "0.0.1",
+  "publisher": "vscode-asymptote",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onView:asymptoteBuildSidebar"
+  ],
+  "files": [
+    "out/**",
+    "src/extension.ts",
+    "README.md",
+    "media/**",
+    "LICENSE"
+  ],
+  "contributes": {
+    "configuration": {
+      "title": "Asymptote Build",
+      "properties": {
+        "asymptoteBuild.executablePath": {
+          "type": "string",
+          "default": "asy",
+          "description": "Path to the Asymptote executable."
+        },
+        "asymptoteBuild.outputFormat": {
+          "type": "string",
+          "default": "pdf",
+          "description": "Output format passed to the Asymptote -f option."
+        },
+        "asymptoteBuild.extraArgs": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional arguments passed to the Asymptote command."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "asymptoteBuild.showSidebar",
+        "title": "Asymptote: Show Sidebar",
+        "category": "Asymptote"
+      },
+      {
+        "command": "asymptoteBuild.exportPdfAndOpen",
+        "title": "Asymptote: Render PDF",
+        "category": "Asymptote"
+      },
+      {
+        "command": "asymptoteBuild.exportWithOptions",
+        "title": "Asymptote: Detailed Export",
+        "category": "Asymptote"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "asymptoteBuildContainer",
+          "title": "Asymptote",
+          "icon": "media/asymptote.svg"
+        }
+      ]
+    },
+    "views": {
+      "asymptoteBuildContainer": [
+        {
+          "id": "asymptoteBuildSidebar",
+          "name": "Asymptote"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "asymptoteBuild.exportPdfAndOpen",
+          "when": "view == asymptoteBuildSidebar",
+          "group": "navigation@1"
+        },
+        {
+          "command": "asymptoteBuild.exportWithOptions",
+          "when": "view == asymptoteBuildSidebar",
+          "group": "navigation@2"
+        },
+        {
+          "command": "asymptoteBuild.showSidebar",
+          "when": "view == asymptoteBuildSidebar",
+          "group": "navigation@3"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "asymptoteBuild.exportPdfAndOpen",
+          "when": "resourceExtname == .asy",
+          "group": "navigation@1"
+        },
+        {
+          "command": "asymptoteBuild.exportWithOptions",
+          "when": "resourceExtname == .asy",
+          "group": "navigation@2"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "@types/vscode": "^1.90.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/vsce": "^3.9.1",
+    "eslint": "^9.25.1",
+    "typescript": "^5.8.3"
+  }
+}
