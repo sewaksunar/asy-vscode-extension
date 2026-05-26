@@ -2,6 +2,7 @@
 
 import * as path from 'path';
 import { execFile } from 'child_process';
+import * as fs from 'fs';
 import * as vscode from 'vscode';
 
 const outputChannel = vscode.window.createOutputChannel('Asymptote Export');
@@ -69,10 +70,10 @@ class AsymptoteSidebarItem extends vscode.TreeItem {
         this.iconPath = new vscode.ThemeIcon('file-code');
         break;
       case 'section':
-        this.iconPath = new vscode.ThemeIcon('folder-opened');
+        this.iconPath = getSectionIcon(labelText);
         break;
       case 'action':
-        this.iconPath = new vscode.ThemeIcon('play');
+        this.iconPath = getActionIcon(labelText, command);
         break;
       case 'info':
         this.iconPath = new vscode.ThemeIcon('info');
@@ -81,13 +82,78 @@ class AsymptoteSidebarItem extends vscode.TreeItem {
   }
 }
 
+function getSectionIcon(labelText: string): vscode.ThemeIcon {
+  const normalized = labelText.toLowerCase();
+
+  if (normalized.includes('build')) {
+    return new vscode.ThemeIcon('tools');
+  }
+  if (normalized.includes('log')) {
+    return new vscode.ThemeIcon('output');
+  }
+  if (normalized.includes('navigate')) {
+    return new vscode.ThemeIcon('layout-sidebar-left');
+  }
+  if (normalized.includes('preset') || normalized.includes('palette')) {
+    return new vscode.ThemeIcon('symbol-color');
+  }
+  if (normalized.includes('structure')) {
+    return new vscode.ThemeIcon('list-tree');
+  }
+  if (normalized.includes('workspace')) {
+    return new vscode.ThemeIcon('files');
+  }
+  if (normalized.includes('document outline')) {
+    return new vscode.ThemeIcon('symbol-namespace');
+  }
+
+  return new vscode.ThemeIcon('folder-opened');
+}
+
+function getActionIcon(labelText: string, command?: vscode.Command): vscode.ThemeIcon {
+  const normalized = labelText.toLowerCase();
+  const commandId = command?.command ?? '';
+
+  if (normalized.includes('render') || commandId.includes('exportPdfAndOpen')) {
+    return new vscode.ThemeIcon('play');
+  }
+  if (normalized.includes('export') || commandId.includes('exportWithOptions') || commandId.includes('runPresetExport')) {
+    return new vscode.ThemeIcon('save-as');
+  }
+  if (normalized.includes('show output') || commandId.includes('showSidebar')) {
+    return new vscode.ThemeIcon('output');
+  }
+  if (normalized.includes('reveal')) {
+    return new vscode.ThemeIcon('folder-opened');
+  }
+  if (normalized.includes('copy')) {
+    return new vscode.ThemeIcon('copy');
+  }
+  if (normalized.includes('open')) {
+    return new vscode.ThemeIcon('open-preview');
+  }
+  if (normalized.includes('draw')) {
+    return new vscode.ThemeIcon('edit');
+  }
+  if (normalized.includes('label')) {
+    return new vscode.ThemeIcon('tag');
+  }
+
+  return new vscode.ThemeIcon('circle-small-filled');
+}
+
 class AsymptoteSidebarProvider implements vscode.TreeDataProvider<AsymptoteSidebarItem> {
   private readonly changeEmitter = new vscode.EventEmitter<AsymptoteSidebarItem | undefined | void>();
 
   readonly onDidChangeTreeData = this.changeEmitter.event;
   private workspaceAsyFiles: vscode.Uri[] = [];
 
-  constructor(private readonly getActiveFilePath: () => string | undefined, context: vscode.ExtensionContext) {
+  // viewType: 'commands' | 'structure' | 'symbols' determines which section this provider renders
+  constructor(
+    private readonly viewType: 'commands' | 'structure' | 'symbols',
+    private readonly getActiveFilePath: () => string | undefined,
+    context: vscode.ExtensionContext,
+  ) {
     this.initFileWatcher(context);
   }
 
@@ -125,92 +191,117 @@ class AsymptoteSidebarProvider implements vscode.TreeDataProvider<AsymptoteSideb
     }
 
     const activeFilePath = this.getActiveFilePath();
+
+    // If no active file, show a hint item for each view
     if (!activeFilePath) {
-      return Promise.resolve([
-        new AsymptoteSidebarItem(
-          'Open an .asy file to enable builds',
-          'info',
-          vscode.TreeItemCollapsibleState.None,
-          undefined,
-          undefined,
-          'The sidebar becomes fully interactive once an Asymptote file is active.',
-        ),
-      ]);
+      const hint = new AsymptoteSidebarItem(
+        'Open an .asy file to enable this view',
+        'info',
+        vscode.TreeItemCollapsibleState.None,
+        undefined,
+        undefined,
+        'The view becomes interactive once an Asymptote file is active.',
+      );
+      return Promise.resolve([hint]);
     }
 
-    const activeFileItem = new AsymptoteSidebarItem(
-      path.basename(activeFilePath),
-      'file',
-      vscode.TreeItemCollapsibleState.Expanded,
-      undefined,
-      [
-        new AsymptoteSidebarItem(
-          activeFilePath,
-          'info',
-          vscode.TreeItemCollapsibleState.None,
-          undefined,
-          undefined,
-          activeFilePath,
-        ),
-      ],
-      activeFilePath,
-      'Current Asymptote document',
-    );
+    if (this.viewType === 'commands') {
+      const buildStatusSection = this.createBuildStatusSection(activeFilePath);
 
-    const buildStatusSection = this.createBuildStatusSection(activeFilePath);
-    const workspaceFilesSection = this.createWorkspaceFilesSection(activeFilePath);
+      const buildActionsSection = new AsymptoteSidebarItem(
+        'Build Asymptote project',
+        'section',
+        vscode.TreeItemCollapsibleState.Expanded,
+        undefined,
+        [
+          this.createActionItem('Render PDF', 'asymptoteBuild.exportPdfAndOpen', 'Render the current file as PDF and open it.'),
+          this.createActionItem('Detailed Export...', 'asymptoteBuild.exportWithOptions', 'Choose a format or quality preset.'),
+        ],
+        'Build and export commands',
+      );
 
-    const quickBuildSection = new AsymptoteSidebarItem(
-      'Quick Build',
-      'section',
-      vscode.TreeItemCollapsibleState.Expanded,
-      undefined,
-      [
-        this.createActionItem('Render PDF', 'asymptoteBuild.exportPdfAndOpen', 'Render the current file as PDF and open it.'),
-        this.createActionItem('Detailed Export...', 'asymptoteBuild.exportWithOptions', 'Choose a format or quality preset.'),
-        this.createActionItem('Open Sidebar View', 'asymptoteBuild.showSidebar', 'Focus the Asymptote activity-bar view.'),
-      ],
-      'Primary export actions',
-    );
+      const logSection = new AsymptoteSidebarItem(
+        'View log messages',
+        'section',
+        vscode.TreeItemCollapsibleState.Expanded,
+        undefined,
+        [
+          this.createActionItem('Show output channel', 'asymptoteBuild.showSidebar', 'Focus the Asymptote activity-bar view.'),
+          this.createActionItem('Reveal Output File', 'asymptoteBuild.revealOutputFile', 'Open the generated file location in the file explorer.'),
+        ],
+        'Recent build status and logs',
+      );
 
-    const exportPresetsSection = new AsymptoteSidebarItem(
-      'Export Presets',
-      'section',
-      vscode.TreeItemCollapsibleState.Expanded,
-      undefined,
-      [
-        this.createPresetItem('Preview PDF in VS Code', 'pdf', true, []),
-        this.createPresetItem('Export SVG without preview', 'svg', false, []),
-        this.createPresetItem('Export PNG without preview', 'png', false, []),
-        this.createPresetItem('Export EPS without preview', 'eps', false, []),
-        this.createPresetItem('Ultra-HD Images', 'pdf', true, ['-noV', '-render=4']),
-        this.createPresetItem('Maximum Crispness for Printing', 'pdf', true, ['-noV', '-render=8']),
-        this.createPresetItem('Pure Mathematical Vector', 'pdf', true, ['-noV', '-render=0']),
-      ],
-      'Quality and format shortcuts',
-    );
+      const navigateSection = new AsymptoteSidebarItem(
+        'Navigate, select, and edit',
+        'section',
+        vscode.TreeItemCollapsibleState.Expanded,
+        undefined,
+        [
+          this.createActionItem('Open Output Folder', 'asymptoteBuild.openOutputFolder', 'Open the folder containing the generated output.'),
+          this.createActionItem('Copy Output Path', 'asymptoteBuild.copyOutputPath', 'Copy the generated output path to the clipboard.'),
+        ],
+        'Utility commands for generated files',
+      );
 
-    const toolsSection = new AsymptoteSidebarItem(
-      'Tools',
-      'section',
-      vscode.TreeItemCollapsibleState.Expanded,
-      undefined,
-      [
-        this.createActionItem('Reveal Output File', 'asymptoteBuild.revealOutputFile', 'Open the generated file location in the file explorer.'),
-        this.createActionItem('Open Output Folder', 'asymptoteBuild.openOutputFolder', 'Open the folder containing the generated output.'),
-        this.createActionItem('Copy Output Path', 'asymptoteBuild.copyOutputPath', 'Copy the generated output path to the clipboard.'),
-      ],
-      'Extra utility commands',
-    );
+      const exportPresetsSection = new AsymptoteSidebarItem(
+        'Export presets',
+        'section',
+        vscode.TreeItemCollapsibleState.Expanded,
+        undefined,
+        [
+          this.createPresetItem('Preview PDF in VS Code', 'pdf', true, []),
+          this.createPresetItem('Export SVG without preview', 'svg', false, []),
+          this.createPresetItem('Export PNG without preview', 'png', false, []),
+          this.createPresetItem('Export EPS without preview', 'eps', false, []),
+          this.createPresetItem('Ultra-HD Images', 'pdf', true, ['-noV', '-render=4']),
+          this.createPresetItem('Maximum Crispness for Printing', 'pdf', true, ['-noV', '-render=8']),
+          this.createPresetItem('Pure Mathematical Vector', 'pdf', true, ['-noV', '-render=0']),
+        ],
+        'Quality and format shortcuts',
+      );
 
-    return Promise.all([buildStatusSection, workspaceFilesSection]).then(([statusItem, filesSection]) => [
-      statusItem,
-      activeFileItem,
-      filesSection,
-      quickBuildSection,
-      exportPresetsSection,
-      toolsSection,
-    ]);
+      return Promise.resolve([buildStatusSection, buildActionsSection, logSection, navigateSection, exportPresetsSection]);
+    }
+
+    if (this.viewType === 'structure') {
+      // Workspace files limited to current file folder
+      const folderChildren = this.workspaceAsyFiles
+        .filter((u) => path.dirname(u.fsPath) === path.dirname(activeFilePath))
+        .map((file) => this.createWorkspaceFileItem(file, activeFilePath))
+        .sort((a, b) => a.labelText.localeCompare(b.labelText));
+
+      if (folderChildren.length === 0) {
+        folderChildren.push(
+          new AsymptoteSidebarItem('No .asy files in current folder', 'info', vscode.TreeItemCollapsibleState.None, undefined, undefined, 'Place .asy files beside the active file.'),
+        );
+      }
+
+      const outlineChildren = parseOutlineForFile(activeFilePath).map((o) => new AsymptoteSidebarItem(o.label, 'file', vscode.TreeItemCollapsibleState.None, {
+        command: 'vscode.open',
+        title: 'Open location',
+        arguments: [vscode.Uri.file(activeFilePath), { selection: o.range }],
+      }, undefined, undefined, o.detail));
+
+      const workspaceSection = new AsymptoteSidebarItem('Workspace files (current folder)', 'section', vscode.TreeItemCollapsibleState.Expanded, undefined, folderChildren, 'Files in the active file folder');
+      const docOutline = new AsymptoteSidebarItem('Document Outline', 'section', vscode.TreeItemCollapsibleState.Expanded, undefined, outlineChildren, 'Functions, paths and labels in current .asy');
+
+      return Promise.resolve([workspaceSection, docOutline]);
+    }
+
+    // symbols view
+    if (this.viewType === 'symbols') {
+      const symbols = getSymbolsList().map((s) => new AsymptoteSidebarItem(s.label, 'action', vscode.TreeItemCollapsibleState.None, {
+        command: 'asymptoteSymbols.insertSymbol',
+        title: 'Insert symbol',
+        arguments: [s.snippet],
+      }, undefined, s.description));
+
+      const categories = new AsymptoteSidebarItem('Palette', 'section', vscode.TreeItemCollapsibleState.Expanded, undefined, symbols, 'Common commands and math symbols');
+      return Promise.resolve([categories]);
+    }
+
+    return Promise.resolve([]);
   }
 
   private createBuildStatusSection(activeFilePath: string): AsymptoteSidebarItem {
@@ -270,33 +361,7 @@ class AsymptoteSidebarProvider implements vscode.TreeDataProvider<AsymptoteSideb
     );
   }
 
-  private createWorkspaceFilesSection(activeFilePath: string): Thenable<AsymptoteSidebarItem> {
-    const children = this.workspaceAsyFiles
-      .map((file) => this.createWorkspaceFileItem(file, activeFilePath))
-      .sort((left, right) => left.labelText.localeCompare(right.labelText));
-
-    if (children.length === 0) {
-      children.push(
-        new AsymptoteSidebarItem(
-          'No .asy files found in workspace',
-          'info',
-          vscode.TreeItemCollapsibleState.None,
-          undefined,
-          undefined,
-          'Add Asymptote files to the workspace to populate this list.',
-        ),
-      );
-    }
-
-    return Promise.resolve(new AsymptoteSidebarItem(
-      'Workspace Files',
-      'section',
-      vscode.TreeItemCollapsibleState.Expanded,
-      undefined,
-      children,
-      'All Asymptote files discovered in the current workspace',
-    ));
-  }
+  
 
   private createWorkspaceFileItem(file: vscode.Uri, activeFilePath: string): AsymptoteSidebarItem {
     const isActive = file.fsPath === activeFilePath;
@@ -359,8 +424,15 @@ export function activate(context: vscode.ExtensionContext) {
   statusBarItem.text = '$(play) Asymptote Render';
   statusBarItem.tooltip = 'Render the active Asymptote file as PDF';
 
-  const sidebarProvider = new AsymptoteSidebarProvider(() => resolveBuildTarget(), context);
-  refreshSidebarView = () => sidebarProvider.refresh();
+  const commandsProvider = new AsymptoteSidebarProvider('commands', () => resolveBuildTarget(), context);
+  const structureProvider = new AsymptoteSidebarProvider('structure', () => resolveBuildTarget(), context);
+  const symbolsProvider = new AsymptoteSidebarProvider('symbols', () => resolveBuildTarget(), context);
+
+  refreshSidebarView = () => {
+    commandsProvider.refresh();
+    structureProvider.refresh();
+    symbolsProvider.refresh();
+  };
 
   const exportPdfCommand = vscode.commands.registerCommand('asymptoteBuild.exportPdfAndOpen', async (resource?: vscode.Uri) => {
     const targetFilePath = resolveBuildTarget(resource);
@@ -463,8 +535,16 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage(`Copied ${path.basename(outputFilePath)} to the clipboard.`);
   });
 
-  const refreshSidebar = () => sidebarProvider.refresh();
+  
   const updateStatusBar = () => updateStatusBarForActiveFile(statusBarItem);
+  // register symbol insert command
+  const insertSymbolCommand = vscode.commands.registerCommand('asymptoteSymbols.insertSymbol', async (snippet: string) => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      return;
+    }
+    await editor.insertSnippet(new vscode.SnippetString(snippet));
+  });
 
   context.subscriptions.push(
     exportPdfCommand,
@@ -474,24 +554,27 @@ export function activate(context: vscode.ExtensionContext) {
     revealOutputFileCommand,
     openOutputFolderCommand,
     copyOutputPathCommand,
+    insertSymbolCommand,
     outputChannel,
     statusBarItem,
-    vscode.window.registerTreeDataProvider('asymptoteBuildSidebar', sidebarProvider),
+    vscode.window.registerTreeDataProvider('asymptoteCommandsView', commandsProvider),
+    vscode.window.registerTreeDataProvider('asymptoteStructureView', structureProvider),
+    vscode.window.registerTreeDataProvider('asymptoteSymbolsView', symbolsProvider),
     vscode.window.onDidChangeActiveTextEditor(() => {
-      refreshSidebar();
+      refreshSidebarView();
       updateStatusBar();
     }),
     vscode.workspace.onDidSaveTextDocument(() => {
-      refreshSidebar();
+      refreshSidebarView();
       updateStatusBar();
     }),
     vscode.workspace.onDidOpenTextDocument(() => {
-      refreshSidebar();
+      refreshSidebarView();
       updateStatusBar();
     }),
   );
 
-  refreshSidebar();
+  refreshSidebarView();
   updateStatusBar();
 }
 
@@ -629,6 +712,51 @@ function resolveOutputFilePath(filePath: string, outputFormat: string, extraArgs
   const baseName = path.basename(filePath, path.extname(filePath));
 
   return path.join(directory, `${baseName}.${outputFormat}`);
+}
+
+function parseOutlineForFile(filePath: string): Array<{ label: string; range: vscode.Range; detail?: string }> {
+  try {
+    const text = fs.readFileSync(filePath, 'utf8');
+    const lines = text.split(/\r?\n/);
+    const items: Array<{ label: string; range: vscode.Range; detail?: string }> = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      // simple heuristics: detect function declarations, path declarations, label usages
+      const funcMatch = line.match(/^(?:void|pair|path)\s+([A-Za-z0-9_]+)\s*\(/);
+      if (funcMatch) {
+        items.push({ label: `func: ${funcMatch[1]}`, range: new vscode.Range(i, 0, i, line.length), detail: lines[i].trim() });
+        continue;
+      }
+
+      const pathMatch = line.match(/^path\s+([A-Za-z0-9_]+)/);
+      if (pathMatch) {
+        items.push({ label: `path: ${pathMatch[1]}`, range: new vscode.Range(i, 0, i, line.length) });
+        continue;
+      }
+
+      const labelMatch = line.match(/label\(/);
+      if (labelMatch) {
+        items.push({ label: `label @ ${i + 1}`, range: new vscode.Range(i, 0, i, line.length) });
+        continue;
+      }
+    }
+
+    return items;
+  } catch (e) {
+    return [];
+  }
+}
+
+function getSymbolsList(): Array<{ label: string; snippet: string; description?: string }> {
+  return [
+    { label: 'draw(path)', snippet: 'draw(${1:path});', description: 'Draw a path' },
+    { label: 'label(string)', snippet: 'label("${1:text}", ${2:position});', description: 'Insert a label' },
+    { label: 'path example', snippet: 'path p = (${1:(0,0)}..${2:(1,1)});', description: 'Create a path' },
+    { label: '→ (arrow)', snippet: '->', description: 'Arrow operator' },
+    { label: 'α (alpha)', snippet: 'alpha', description: 'Greek alpha' },
+    { label: 'β (beta)', snippet: 'beta', description: 'Greek beta' },
+  ];
 }
 
 function updateStatusBarForActiveFile(statusBarItem: vscode.StatusBarItem): void {
