@@ -17,7 +17,9 @@
   ],
   "main": "./out/extension.js",
   "activationEvents": [
-    "onView:asymptoteBuildSidebar",
+    "onView:asymptoteCommandsView",
+    "onView:asymptoteStructureView",
+    "onView:asymptoteSymbolsView",
     "onLanguage:asy"
   ],
   "files": [
@@ -70,12 +72,20 @@
       {
         "command": "asymptoteBuild.exportPdfAndOpen",
         "title": "Asymptote: Render PDF",
-        "category": "Asymptote"
+        "category": "Asymptote",
+        "icon": {
+          "light": "media/render-pdf.svg",
+          "dark": "media/render-pdf.svg"
+        }
       },
       {
         "command": "asymptoteBuild.exportWithOptions",
         "title": "Asymptote: Detailed Export",
-        "category": "Asymptote"
+        "category": "Asymptote",
+        "icon": {
+          "light": "media/detailed-export.svg",
+          "dark": "media/detailed-export.svg"
+        }
       }
     ],
     "viewsContainers": {
@@ -90,8 +100,16 @@
     "views": {
       "asymptoteBuildContainer": [
         {
-          "id": "asymptoteBuildSidebar",
-          "name": "Asymptote"
+          "id": "asymptoteCommandsView",
+          "name": "Commands"
+        },
+        {
+          "id": "asymptoteStructureView",
+          "name": "Structure"
+        },
+        {
+          "id": "asymptoteSymbolsView",
+          "name": "Symbols / Palette"
         }
       ]
     },
@@ -99,18 +117,13 @@
       "view/title": [
         {
           "command": "asymptoteBuild.exportPdfAndOpen",
-          "when": "view == asymptoteBuildSidebar",
+          "when": "view == asymptoteCommandsView",
           "group": "navigation@1"
         },
         {
           "command": "asymptoteBuild.exportWithOptions",
-          "when": "view == asymptoteBuildSidebar",
+          "when": "view == asymptoteCommandsView",
           "group": "navigation@2"
-        },
-        {
-          "command": "asymptoteBuild.showSidebar",
-          "when": "view == asymptoteBuildSidebar",
-          "group": "navigation@3"
         }
       ],
       "editor/title": [
