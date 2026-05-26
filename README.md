@@ -27,12 +27,12 @@ At its core, this extension simplifies the rendering pipeline for Asymptote:
 Access commands quickly via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`), the editor title bar, or the status bar.
 
 ### Core Commands
-* **`Asymptote: Render PDF`** - Compiles the current `.asy` file to PDF and instantly opens the preview inside VS Code.
+* **`Asymptote: Render JPG`** - Compiles the current `.asy` file to JPG and instantly opens the preview inside VS Code.
 * **`Asymptote: Detailed Export`** - Opens an interactive Quick Pick menu offering a variety of preview/export formats and render presets.
 
 ### User Interface Enhancements
 * **Editor Title Bar:** Provides quick-action icons for immediate rendering when an `.asy` file is open.
-* **Status Bar:** A dedicated **`Asymptote Render`** button appears dynamically when an `.asy` file is active.
+* **Status Bar:** A dedicated **`Asymptote Render JPG`** button appears dynamically when an `.asy` file is active.
 
 ### Detailed Export Options
 The `Detailed Export` command provides the following built-in workflows and quality presets:
@@ -40,8 +40,8 @@ The `Detailed Export` command provides the following built-in workflows and qual
 | Export Option | Description / CLI Command |
 | :--- | :--- |
 | **Preview PDF** | Compiles to PDF and opens the preview inside VS Code. |
-| **Standard Export** | Export to **PDF**, **SVG**, **PNG**, or **EPS** (without opening a preview). |
-| **Low-Res PNG** | `asy -f png -noV -render=8 test.asy` |
+| **Standard Export** | Export to **JPG**, **PDF**, **SVG**, or **EPS** (without opening a preview). |
+| **Low-Res JPG** | `asy -f jpg -noV -render=8 test.asy` |
 | **Ultra-HD Images** | `asy -f pdf -noV -render=4 test.asy` |
 | **Maximum Crispness** | Optimized for Printing: `asy -f pdf -noV -render=8 test.asy` |
 | **Pure Vector** | Pure Mathematical Vector: `asy -f pdf -noV -render=0 test.asy` |
@@ -67,7 +67,7 @@ Customize the extension's behavior via your VS Code `settings.json` or the Setti
 | Setting | Default | Description |
 | :--- | :--- | :--- |
 | `asymptoteBuild.executablePath` | `"asy"` | The path to the Asymptote executable. |
-| `asymptoteBuild.outputFormat` | `"pdf"` | The default output format (value passed to the `-f` flag). |
+| `asymptoteBuild.outputFormat` | `"jpg"` | The default output format (value passed to the `-f` flag). |
 | `asymptoteBuild.extraArgs` | `""` | Additional CLI arguments passed to the `asy` command. |
 
 ---
@@ -91,4 +91,4 @@ Want to contribute or modify the extension locally? Follow these steps to set up
 
 4. Test the extension:
 * Open any `.asy` file in the Development Host window.
-* Run the `Asymptote: Render PDF` command.
+* Run the `Asymptote: Render JPG` command.
