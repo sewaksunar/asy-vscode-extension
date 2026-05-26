@@ -7,33 +7,40 @@ import * as vscode from 'vscode';
 
 const outputChannel = vscode.window.createOutputChannel('Asymptote Export');
 let refreshSidebarView: () => void = () => undefined;
-const exportOptions = [
-  { label: 'Preview PDF in VS Code', value: 'pdf', open: true, extraArgs: [] as string[] },
-  { label: 'Export PDF without preview', value: 'pdf', open: false, extraArgs: [] as string[] },
-  { label: 'Export SVG without preview', value: 'svg', open: false, extraArgs: [] as string[] },
-  { label: 'Export PNG without preview', value: 'png', open: false, extraArgs: [] as string[] },
-  { label: 'Export EPS without preview', value: 'eps', open: false, extraArgs: [] as string[] },
+const defaultPreviewFormat = 'jpg';
+const renderOptions = [
+  { label: 'Render JPG', value: 'jpg', open: false, extraArgs: [] as string[] },
+  { label: 'Render PDF', value: 'pdf', open: false, extraArgs: [] as string[] },
+  { label: 'Render SVG', value: 'svg', open: false, extraArgs: [] as string[] },
+  { label: 'Render EPS', value: 'eps', open: false, extraArgs: [] as string[] },
   {
     label: 'Ultra-HD Images',
     description: 'Best for lighting, surfaces, and shading',
     value: 'pdf',
-    open: true,
+    open: false,
     extraArgs: ['-noV', '-render=4'],
   },
   {
     label: 'Maximum Crispness for Printing',
     description: 'Highest render quality for PDF output',
     value: 'pdf',
-    open: true,
+    open: false,
     extraArgs: ['-noV', '-render=8'],
   },
   {
     label: 'Pure Mathematical Vector',
     description: 'Best for flat lines, math grids, and text',
     value: 'pdf',
-    open: true,
+    open: false,
     extraArgs: ['-noV', '-render=0'],
   },
+];
+
+const previewOptions = [
+  { label: 'Preview JPG in VS Code', value: 'jpg', open: true, extraArgs: [] as string[] },
+  { label: 'Preview PDF in VS Code', value: 'pdf', open: true, extraArgs: [] as string[] },
+  { label: 'Preview SVG in VS Code', value: 'svg', open: true, extraArgs: [] as string[] },
+  { label: 'Preview EPS in VS Code', value: 'eps', open: true, extraArgs: [] as string[] },
 ];
 
 type SidebarItemKind = 'file' | 'section' | 'action' | 'info';
@@ -214,7 +221,7 @@ class AsymptoteSidebarProvider implements vscode.TreeDataProvider<AsymptoteSideb
         vscode.TreeItemCollapsibleState.Expanded,
         undefined,
         [
-          this.createActionItem('Render PDF', 'asymptoteBuild.exportPdfAndOpen', 'Render the current file as PDF and open it.'),
+          this.createActionItem('Render JPG', 'asymptoteBuild.exportPdfAndOpen', 'Render the current file as JPG and open it.'),
           this.createActionItem('Detailed Export...', 'asymptoteBuild.exportWithOptions', 'Choose a format or quality preset.'),
         ],
         'Build and export commands',
@@ -252,7 +259,7 @@ class AsymptoteSidebarProvider implements vscode.TreeDataProvider<AsymptoteSideb
         [
           this.createPresetItem('Preview PDF in VS Code', 'pdf', true, []),
           this.createPresetItem('Export SVG without preview', 'svg', false, []),
-          this.createPresetItem('Export PNG without preview', 'png', false, []),
+          this.createPresetItem('Export JPG without preview', 'jpg', false, []),
           this.createPresetItem('Export EPS without preview', 'eps', false, []),
           this.createPresetItem('Ultra-HD Images', 'pdf', true, ['-noV', '-render=4']),
           this.createPresetItem('Maximum Crispness for Printing', 'pdf', true, ['-noV', '-render=8']),
@@ -420,9 +427,9 @@ class AsymptoteSidebarProvider implements vscode.TreeDataProvider<AsymptoteSideb
 
 export function activate(context: vscode.ExtensionContext) {
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  statusBarItem.command = 'asymptoteBuild.exportPdfAndOpen';
-  statusBarItem.text = '$(play) Asymptote Render';
-  statusBarItem.tooltip = 'Render the active Asymptote file as PDF';
+  statusBarItem.command = 'asymptoteBuild.exportAsJpg';
+  statusBarItem.text = '$(play) Asymptote Render JPG';
+  statusBarItem.tooltip = 'Render the active Asymptote file as JPG';
 
   const commandsProvider = new AsymptoteSidebarProvider('commands', () => resolveBuildTarget(), context);
   const structureProvider = new AsymptoteSidebarProvider('structure', () => resolveBuildTarget(), context);
@@ -446,7 +453,97 @@ export function activate(context: vscode.ExtensionContext) {
     const executablePath = configuration.get<string>('executablePath', 'asy');
     const extraArgs = configuration.get<string[]>('extraArgs', []);
 
+    await exportAsymptoteFile(executablePath, defaultPreviewFormat, extraArgs, targetFilePath, true);
+  });
+
+  const previewWithOptionsCommand = vscode.commands.registerCommand('asymptoteBuild.previewWithOptions', async (resource?: vscode.Uri) => {
+    const targetFilePath = resolveBuildTarget(resource);
+
+    if (!targetFilePath) {
+      vscode.window.showErrorMessage('Open or select an Asymptote file before previewing.');
+      return;
+    }
+
+    const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+    const extraArgs = configuration.get<string[]>('extraArgs', []);
+    const picked = await vscode.window.showQuickPick(previewOptions.map((option) => ({ label: option.label, description: `${option.value.toUpperCase()} preview`, value: option.value, extraArgs: option.extraArgs })), {
+      title: 'Choose an Asymptote preview option',
+      placeHolder: 'Select the file type to preview in VS Code',
+    });
+
+    if (!picked) {
+      return;
+    }
+
+    const selectedFormat = (picked as any).value as string;
+    const outputFilePath = resolveOutputFilePath(targetFilePath, selectedFormat, extraArgs);
+
+    if (!fs.existsSync(outputFilePath)) {
+      vscode.window.showErrorMessage(`No rendered file found. Run Render first, then choose a preview format.`);
+      return;
+    }
+
+    await openFileInSplit(outputFilePath);
+  });
+
+  const previewAsPdfCommand = vscode.commands.registerCommand('asymptoteBuild.previewAsPdf', async (resource?: vscode.Uri) => {
+    const targetFilePath = resolveBuildTarget(resource);
+
+    if (!targetFilePath) {
+      vscode.window.showErrorMessage('Open or select an Asymptote file before previewing.');
+      return;
+    }
+
+    const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+    const executablePath = configuration.get<string>('executablePath', 'asy');
+    const extraArgs = configuration.get<string[]>('extraArgs', []);
+
     await exportAsymptoteFile(executablePath, 'pdf', extraArgs, targetFilePath, true);
+  });
+
+  const previewAsSvgCommand = vscode.commands.registerCommand('asymptoteBuild.previewAsSvg', async (resource?: vscode.Uri) => {
+    const targetFilePath = resolveBuildTarget(resource);
+
+    if (!targetFilePath) {
+      vscode.window.showErrorMessage('Open or select an Asymptote file before previewing.');
+      return;
+    }
+
+    const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+    const executablePath = configuration.get<string>('executablePath', 'asy');
+    const extraArgs = configuration.get<string[]>('extraArgs', []);
+
+    await exportAsymptoteFile(executablePath, 'svg', extraArgs, targetFilePath, true);
+  });
+
+  const previewAsJpgCommand = vscode.commands.registerCommand('asymptoteBuild.previewAsJpg', async (resource?: vscode.Uri) => {
+    const targetFilePath = resolveBuildTarget(resource);
+
+    if (!targetFilePath) {
+      vscode.window.showErrorMessage('Open or select an Asymptote file before previewing.');
+      return;
+    }
+
+    const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+    const executablePath = configuration.get<string>('executablePath', 'asy');
+    const extraArgs = configuration.get<string[]>('extraArgs', []);
+
+    await exportAsymptoteFile(executablePath, 'jpg', extraArgs, targetFilePath, true);
+  });
+
+  const previewAsEpsCommand = vscode.commands.registerCommand('asymptoteBuild.previewAsEps', async (resource?: vscode.Uri) => {
+    const targetFilePath = resolveBuildTarget(resource);
+
+    if (!targetFilePath) {
+      vscode.window.showErrorMessage('Open or select an Asymptote file before previewing.');
+      return;
+    }
+
+    const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+    const executablePath = configuration.get<string>('executablePath', 'asy');
+    const extraArgs = configuration.get<string[]>('extraArgs', []);
+
+    await exportAsymptoteFile(executablePath, 'eps', extraArgs, targetFilePath, true);
   });
 
   const exportOptionsCommand = vscode.commands.registerCommand('asymptoteBuild.exportWithOptions', async (resource?: vscode.Uri) => {
@@ -457,7 +554,7 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    const format = await vscode.window.showQuickPick(exportOptions, {
+    const format = await vscode.window.showQuickPick(renderOptions, {
       title: 'Choose an Asymptote export option',
       placeHolder: 'Select preview, export format, or a render-quality preset',
     });
@@ -510,7 +607,7 @@ export function activate(context: vscode.ExtensionContext) {
     await exportAsymptoteFile(executablePath, 'svg', extraArgs, targetFilePath, false);
   });
 
-  const exportAsPngCommand = vscode.commands.registerCommand('asymptoteBuild.exportAsPng', async (resource?: vscode.Uri) => {
+  const exportAsJpgCommand = vscode.commands.registerCommand('asymptoteBuild.exportAsJpg', async (resource?: vscode.Uri) => {
     const targetFilePath = resolveBuildTarget(resource);
 
     if (!targetFilePath) {
@@ -522,7 +619,7 @@ export function activate(context: vscode.ExtensionContext) {
     const executablePath = configuration.get<string>('executablePath', 'asy');
     const extraArgs = configuration.get<string[]>('extraArgs', []);
 
-    await exportAsymptoteFile(executablePath, 'png', extraArgs, targetFilePath, false);
+    await exportAsymptoteFile(executablePath, 'jpg', extraArgs, targetFilePath, false);
   });
 
   const exportAsEpsCommand = vscode.commands.registerCommand('asymptoteBuild.exportAsEps', async (resource?: vscode.Uri) => {
@@ -550,7 +647,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
     const extraArgs = configuration.get<string[]>('extraArgs', []);
-    const outputFilePath = resolveOutputFilePath(targetFilePath, 'pdf', extraArgs);
+    const outputFilePath = resolveOutputFilePath(targetFilePath, defaultPreviewFormat, extraArgs);
 
     await openPdfPreviewInSplit(outputFilePath);
   });
@@ -608,6 +705,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     exportPdfCommand,
+    previewWithOptionsCommand,
     exportOptionsCommand,
     showSidebarCommand,
     runPresetExportCommand,
@@ -615,8 +713,12 @@ export function activate(context: vscode.ExtensionContext) {
     openOutputFolderCommand,
     copyOutputPathCommand,
     exportAsSvgCommand,
-    exportAsPngCommand,
+    exportAsJpgCommand,
     exportAsEpsCommand,
+    previewAsPdfCommand,
+    previewAsSvgCommand,
+    previewAsJpgCommand,
+    previewAsEpsCommand,
     previewToRightCommand,
     insertSymbolCommand,
     outputChannel,
@@ -688,7 +790,7 @@ async function exportAsymptoteFile(
 
   try {
     const timeoutMs = configuration.get<number>('timeout', 30000);
-    const renderArgs = outputFormat === 'pdf' ? ['-noV', ...extraArgs] : extraArgs;
+    const renderArgs = ['jpg', 'png', 'pdf'].includes(outputFormat) ? ['-noV', ...extraArgs] : extraArgs;
     const result = await runAsymptoteBuild(executablePath, outputFormat, renderArgs, targetFilePath, timeoutMs);
     if (result.stdout) {
       outputChannel.append(result.stdout);
@@ -779,10 +881,19 @@ function resolveOutputFilePath(filePath: string, outputFormat: string, extraArgs
   return path.join(directory, `${baseName}.${outputFormat}`);
 }
 
-async function openPdfPreviewInSplit(outputFilePath: string): Promise<void> {
+async function openFileInSplit(outputFilePath: string): Promise<void> {
   const uri = vscode.Uri.file(outputFilePath);
+  const ext = path.extname(outputFilePath).toLowerCase().slice(1);
 
-  await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: vscode.ViewColumn.Beside, preview: false });
+  if (ext === 'pdf') {
+    await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: vscode.ViewColumn.Beside, preview: false });
+  } else {
+    await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: vscode.ViewColumn.Beside, preview: true });
+  }
+}
+
+async function openPdfPreviewInSplit(outputFilePath: string): Promise<void> {
+  await openFileInSplit(outputFilePath);
 }
 
 function parseOutlineForFile(filePath: string): Array<{ label: string; range: vscode.Range; detail?: string }> {
