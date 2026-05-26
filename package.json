@@ -86,6 +86,36 @@
           "light": "media/detailed-export.svg",
           "dark": "media/detailed-export.svg"
         }
+      },
+      {
+        "command": "asymptoteBuild.exportAsSvg",
+        "title": "Asymptote: Export as SVG",
+        "category": "Asymptote"
+      },
+      {
+        "command": "asymptoteBuild.exportAsPng",
+        "title": "Asymptote: Export as PNG",
+        "category": "Asymptote"
+      },
+      {
+        "command": "asymptoteBuild.exportAsEps",
+        "title": "Asymptote: Export as EPS",
+        "category": "Asymptote"
+      },
+      {
+        "command": "asymptoteBuild.previewToRight",
+        "title": "Asymptote: Open Preview to Right",
+        "category": "Asymptote",
+        "icon": {
+          "light": "media/preview-right.svg",
+          "dark": "media/preview-right.svg"
+        }
+      }
+    ],
+    "submenus": [
+      {
+        "id": "asymptoteBuild.renderMenu",
+        "label": "Render"
       }
     ],
     "viewsContainers": {
@@ -121,9 +151,36 @@
           "group": "navigation@1"
         },
         {
-          "command": "asymptoteBuild.exportWithOptions",
+          "submenu": "asymptoteBuild.renderMenu",
+          "when": "resourceExtname == .asy",
+          "group": "navigation@1"
+        },
+        {
+          "command": "asymptoteBuild.previewToRight",
           "when": "resourceExtname == .asy",
           "group": "navigation@2"
+        }
+      ],
+      "asymptoteBuild.renderMenu": [
+        {
+          "command": "asymptoteBuild.exportPdfAndOpen",
+          "group": "1"
+        },
+        {
+          "command": "asymptoteBuild.exportAsSvg",
+          "group": "1"
+        },
+        {
+          "command": "asymptoteBuild.exportAsPng",
+          "group": "1"
+        },
+        {
+          "command": "asymptoteBuild.exportAsEps",
+          "group": "1"
+        },
+        {
+          "command": "asymptoteBuild.exportWithOptions",
+          "group": "2"
         }
       ]
     }

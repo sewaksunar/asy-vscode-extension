@@ -495,6 +495,66 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
+  const exportAsSvgCommand = vscode.commands.registerCommand('asymptoteBuild.exportAsSvg', async (resource?: vscode.Uri) => {
+    const targetFilePath = resolveBuildTarget(resource);
+
+    if (!targetFilePath) {
+      vscode.window.showErrorMessage('Open or select an Asymptote file before exporting.');
+      return;
+    }
+
+    const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+    const executablePath = configuration.get<string>('executablePath', 'asy');
+    const extraArgs = configuration.get<string[]>('extraArgs', []);
+
+    await exportAsymptoteFile(executablePath, 'svg', extraArgs, targetFilePath, false);
+  });
+
+  const exportAsPngCommand = vscode.commands.registerCommand('asymptoteBuild.exportAsPng', async (resource?: vscode.Uri) => {
+    const targetFilePath = resolveBuildTarget(resource);
+
+    if (!targetFilePath) {
+      vscode.window.showErrorMessage('Open or select an Asymptote file before exporting.');
+      return;
+    }
+
+    const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+    const executablePath = configuration.get<string>('executablePath', 'asy');
+    const extraArgs = configuration.get<string[]>('extraArgs', []);
+
+    await exportAsymptoteFile(executablePath, 'png', extraArgs, targetFilePath, false);
+  });
+
+  const exportAsEpsCommand = vscode.commands.registerCommand('asymptoteBuild.exportAsEps', async (resource?: vscode.Uri) => {
+    const targetFilePath = resolveBuildTarget(resource);
+
+    if (!targetFilePath) {
+      vscode.window.showErrorMessage('Open or select an Asymptote file before exporting.');
+      return;
+    }
+
+    const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+    const executablePath = configuration.get<string>('executablePath', 'asy');
+    const extraArgs = configuration.get<string[]>('extraArgs', []);
+
+    await exportAsymptoteFile(executablePath, 'eps', extraArgs, targetFilePath, false);
+  });
+
+  const previewToRightCommand = vscode.commands.registerCommand('asymptoteBuild.previewToRight', async (resource?: vscode.Uri) => {
+    const targetFilePath = resolveBuildTarget(resource);
+
+    if (!targetFilePath) {
+      vscode.window.showErrorMessage('Open or select an Asymptote file before previewing.');
+      return;
+    }
+
+    const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
+    const extraArgs = configuration.get<string[]>('extraArgs', []);
+    const outputFilePath = resolveOutputFilePath(targetFilePath, 'pdf', extraArgs);
+
+    await openPdfPreviewInSplit(outputFilePath);
+  });
+
   const revealOutputFileCommand = vscode.commands.registerCommand('asymptoteBuild.revealOutputFile', async () => {
     const targetFilePath = resolveBuildTarget();
 
@@ -554,6 +614,10 @@ export function activate(context: vscode.ExtensionContext) {
     revealOutputFileCommand,
     openOutputFolderCommand,
     copyOutputPathCommand,
+    exportAsSvgCommand,
+    exportAsPngCommand,
+    exportAsEpsCommand,
+    previewToRightCommand,
     insertSymbolCommand,
     outputChannel,
     statusBarItem,
@@ -643,7 +707,7 @@ async function exportAsymptoteFile(
 
     if (openOutput) {
       const outputFilePath = resolveOutputFilePath(targetFilePath, outputFormat, extraArgs);
-      await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(outputFilePath));
+      await openPdfPreviewInSplit(outputFilePath);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -712,6 +776,12 @@ function resolveOutputFilePath(filePath: string, outputFormat: string, extraArgs
   const baseName = path.basename(filePath, path.extname(filePath));
 
   return path.join(directory, `${baseName}.${outputFormat}`);
+}
+
+async function openPdfPreviewInSplit(outputFilePath: string): Promise<void> {
+  const uri = vscode.Uri.file(outputFilePath);
+
+  await vscode.commands.executeCommand('vscode.openWith', uri, 'default', { viewColumn: vscode.ViewColumn.Beside });
 }
 
 function parseOutlineForFile(filePath: string): Array<{ label: string; range: vscode.Range; detail?: string }> {
