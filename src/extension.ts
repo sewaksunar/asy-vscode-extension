@@ -688,7 +688,8 @@ async function exportAsymptoteFile(
 
   try {
     const timeoutMs = configuration.get<number>('timeout', 30000);
-    const result = await runAsymptoteBuild(executablePath, outputFormat, extraArgs, targetFilePath, timeoutMs);
+    const renderArgs = outputFormat === 'pdf' ? ['-noV', ...extraArgs] : extraArgs;
+    const result = await runAsymptoteBuild(executablePath, outputFormat, renderArgs, targetFilePath, timeoutMs);
     if (result.stdout) {
       outputChannel.append(result.stdout);
     }
@@ -781,7 +782,7 @@ function resolveOutputFilePath(filePath: string, outputFormat: string, extraArgs
 async function openPdfPreviewInSplit(outputFilePath: string): Promise<void> {
   const uri = vscode.Uri.file(outputFilePath);
 
-  await vscode.commands.executeCommand('vscode.openWith', uri, 'default', { viewColumn: vscode.ViewColumn.Beside });
+  await vscode.commands.executeCommand('vscode.open', uri, { viewColumn: vscode.ViewColumn.Beside, preview: false });
 }
 
 function parseOutlineForFile(filePath: string): Array<{ label: string; range: vscode.Range; detail?: string }> {
