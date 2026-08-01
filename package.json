@@ -147,6 +147,22 @@
         }
       ]
     },
+    "languages": [
+      {
+        "id": "asy",
+        "aliases": [
+          "Asymptote",
+          "asy"
+        ],
+        "extensions": [
+          ".asy"
+        ],
+        "icon": {
+          "light": "media/asymptote.svg",
+          "dark": "media/asymptote.svg"
+        }
+      }
+    ],
     "menus": {
       "editor/title": [
         {
