@@ -592,6 +592,8 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
+
+
   const exportAsSvgCommand = vscode.commands.registerCommand('asymptoteBuild.exportAsSvg', async (resource?: vscode.Uri) => {
     const targetFilePath = resolveBuildTarget(resource);
 
@@ -741,9 +743,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   refreshSidebarView();
-  updateStatusBar();
 }
-
 export function deactivate() {
   outputChannel.dispose();
 }
@@ -767,9 +767,7 @@ function resolveBuildTarget(resource?: vscode.Uri): string | undefined {
     return undefined;
   }
 
-  return document.languageId === 'asy' || path.extname(document.fileName).toLowerCase() === '.asy'
-    ? document.fileName
-    : undefined;
+  return path.extname(document.fileName).toLowerCase() === '.asy' ? document.fileName : undefined;
 }
 
 async function exportAsymptoteFile(
@@ -781,17 +779,17 @@ async function exportAsymptoteFile(
 ): Promise<void> {
   const configuration = vscode.workspace.getConfiguration('asymptoteBuild');
   const showOutputOnBuild = configuration.get<boolean>('showOutputOnBuild', true);
-  
+
   outputChannel.clear();
   if (showOutputOnBuild) {
     outputChannel.show(true);
   }
   outputChannel.appendLine(`Exporting ${targetFilePath} as ${outputFormat.toUpperCase()}`);
-
   try {
     const timeoutMs = configuration.get<number>('timeout', 30000);
     const renderArgs = ['jpg', 'png', 'pdf'].includes(outputFormat) ? ['-noV', ...extraArgs] : extraArgs;
     const result = await runAsymptoteBuild(executablePath, outputFormat, renderArgs, targetFilePath, timeoutMs);
+
     if (result.stdout) {
       outputChannel.append(result.stdout);
     }

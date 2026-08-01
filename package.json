@@ -19,13 +19,13 @@
   "activationEvents": [
     "onView:asymptoteCommandsView",
     "onView:asymptoteStructureView",
-    "onView:asymptoteSymbolsView",
-    "onLanguage:asy"
+    "onView:asymptoteSymbolsView"
   ],
   "files": [
     "out/**",
     "src/extension.ts",
     "README.md",
+    "syntaxes/**",
     "media/**",
     "LICENSE"
   ],
@@ -157,10 +157,18 @@
         "extensions": [
           ".asy"
         ],
+        "configuration": "./syntaxes/language-configuration.json",
         "icon": {
           "light": "media/asymptote.svg",
           "dark": "media/asymptote.svg"
         }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "asy",
+        "scopeName": "source.asy",
+        "path": "./syntaxes/asy.tmLanguage.json"
       }
     ],
     "menus": {

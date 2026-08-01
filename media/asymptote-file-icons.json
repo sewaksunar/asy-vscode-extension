@@ -1,0 +1,10 @@
+{
+  "iconDefinitions": {
+    "_file_asy": {
+      "iconPath": "./asymptote.svg"
+    }
+  },
+  "fileExtensions": {
+    "asy": "_file_asy"
+  }
+}
