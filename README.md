@@ -17,11 +17,13 @@ At its core, this extension simplifies the rendering pipeline for Asymptote:
 
 ## 📸 Preview
 
-*(Add a GIF or screenshot here demonstrating the extension in action)*
-![Extension Preview](images/preview.gif)
+Screen capture of the extension in action, demonstrating the rendering of a `.asy` file to JPG and previewing it within VS Code.
+![Extension Screen Capture](media\previews\v0.1.1.png)
+
+Demonstration of the extension's core features, including rendering a `.asy` file to JPG and previewing it within VS Code.
+![Extension Demo](media\previews\v0.1.1.gif)
 
 ---
-
 ## 🛠 Features & Commands
 
 Access commands quickly via the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`), the editor title bar, or the status bar.
@@ -46,6 +48,15 @@ The `Detailed Export` command provides the following built-in workflows and qual
 | **Maximum Crispness** | Optimized for Printing: `asy -f pdf -noV -render=8 test.asy` |
 | **Pure Vector** | Pure Mathematical Vector: `asy -f pdf -noV -render=0 test.asy` |
 
+### Syntax Highlighting
+The extension provides syntax highlighting for `.asy` files, enhancing readability and code comprehension.
+
+### Source Code Navigation
+* **Go to Definition:** Jump directly to the definition of functions, variables, and other symbols within your `.asy` files.
+* **Find All References:** Locate all usages of a specific function, variable, or symbol within your `.asy` files.
+
+### Iconography
+The extension includes a set of custom icons for `.asy` files, enhancing visual identification in the file explorer and tabs.
 ---
 
 ## 🗂 Asymptote Sidebar
