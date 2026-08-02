@@ -933,9 +933,9 @@ function getSymbolsList(): Array<{ label: string; snippet: string; description?:
     { label: 'draw(path)', snippet: 'draw(${1:path});', description: 'Draw a path' },
     { label: 'label(string)', snippet: 'label("${1:text}", ${2:position});', description: 'Insert a label' },
     { label: 'path example', snippet: 'path p = (${1:(0,0)}..${2:(1,1)});', description: 'Create a path' },
-    { label: '→ (arrow)', snippet: '->', description: 'Arrow operator' },
-    { label: 'α (alpha)', snippet: 'alpha', description: 'Greek alpha' },
-    { label: 'β (beta)', snippet: 'beta', description: 'Greek beta' },
+    { label: '$->$ (arrow)', snippet: '$->$', description: 'Arrow operator' },
+    { label: '$alpha$ (alpha)', snippet: '$alpha$', description: 'Greek alpha' },
+    { label: '$beta$ (beta)', snippet: '$beta$', description: 'Greek beta' },
   ];
 }
 

@@ -2,7 +2,7 @@
   "name": "asy-vscode-extension",
   "displayName": "Asy VSCode Extension",
   "description": "Build and preview Asymptote (.asy) files from within Visual Studio Code.",
-  "version": "0.0.1",
+  "version": "0.1.1",
   "publisher": "vscode-asymptote",
   "license": "MIT",
   "repository": {
@@ -83,8 +83,8 @@
         "title": "Asymptote: Detailed Export",
         "category": "Asymptote",
         "icon": {
-          "light": "media/render-drop.svg",
-          "dark": "media/render-drop.svg"
+          "light": "media/render-dropdown.svg",
+          "dark": "media/render-dropdown.svg"
         }
       },
       {
@@ -92,8 +92,8 @@
         "title": "Asymptote: Detailed Preview",
         "category": "Asymptote",
         "icon": {
-          "light": "media/preview-drop.svg",
-          "dark": "media/preview-drop.svg"
+          "light": "media/preview-dropdown.svg",
+          "dark": "media/preview-dropdown.svg"
         }
       },
       {
@@ -116,8 +116,8 @@
         "title": "Asymptote: Open Preview to Right",
         "category": "Asymptote",
         "icon": {
-          "light": "media/preview-dark.svg",
-          "dark": "media/preview-dark.svg"
+          "light": "media/preview.svg",
+          "dark": "media/preview.svg"
         }
       }
     ],
