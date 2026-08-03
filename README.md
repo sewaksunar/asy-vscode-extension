@@ -18,10 +18,10 @@ At its core, this extension simplifies the rendering pipeline for Asymptote:
 ## 📸 Preview
 
 Screen capture of the extension in action, demonstrating the rendering of a `.asy` file to JPG and previewing it within VS Code.
-![Extension Screen Capture](media\previews\v0.1.1.png)
+![Extension Screen Capture](media/previews/v0.1.1.png)
 
 Demonstration of the extension's core features, including rendering a `.asy` file to JPG and previewing it within VS Code.
-![Extension Demo](media\previews\v0.1.1.gif)
+![Extension Demo](media/previews/v0.1.1.gif)
 
 ---
 ## 🛠 Features & Commands
